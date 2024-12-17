@@ -60,7 +60,6 @@ public class ClientForm extends JFrame {
                 socket.close();
                 return;
             }
-
             JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             new Thread(this::receiveScreen).start();
             setupControlListeners();

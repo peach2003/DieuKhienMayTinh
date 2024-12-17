@@ -26,30 +26,21 @@ public class ClientForm extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel topPanel = new JPanel();
-        topPanel.setLayout(new GridLayout(1, 3));
-
-        serverIpField = new JTextField("Enter Server IP");
+        JPanel topPanel = new JPanel(new GridLayout(1, 3));
+        serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
-
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
         add(topPanel, BorderLayout.NORTH);
         add(screenLabel, BorderLayout.CENTER);
 
         connectButton.addActionListener(e -> connectToServer());
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            ClientForm clientForm = new ClientForm();
-            clientForm.setVisible(true);
-        });
     }
 
     private void connectToServer() {
@@ -62,18 +53,19 @@ public class ClientForm extends JFrame {
             inputStream = new ObjectInputStream(socket.getInputStream());
 
             outputStream.writeObject(password);
-            String response = (String) inputStream.readObject();
 
-            if (!response.equals("Client authenticated successfully")) {
-                JOptionPane.showMessageDialog(this, "Authentication Failed");
+            String response = (String) inputStream.readObject();
+            if (!response.equals("Máy khách xác thực thành công")) {
+                JOptionPane.showMessageDialog(this, "Xác thực thất bại!");
                 socket.close();
                 return;
             }
 
-            JOptionPane.showMessageDialog(this, "Connected to Server");
+            JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             new Thread(this::receiveScreen).start();
+            setupControlListeners();
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Connection Error: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Lỗi kết nối: " + e.getMessage());
         }
     }
 
@@ -86,8 +78,52 @@ public class ClientForm extends JFrame {
                 screenLabel.repaint();
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Disconnected from Server");
+            JOptionPane.showMessageDialog(this, "Mất kết nối với Server!");
         }
     }
-}
 
+    private void setupControlListeners() {
+        screenLabel.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                try {
+                    int x = e.getX();
+                    int y = e.getY();
+                    outputStream.writeObject("mouse," + x + "," + y);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        screenLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                try {
+                    outputStream.writeObject("click");
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        screenLabel.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                try {
+                    int keyCode = e.getKeyCode();
+                    outputStream.writeObject("key," + keyCode);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            ClientForm clientForm = new ClientForm();
+            clientForm.setVisible(true);
+        });
+    }
+}

@@ -6,49 +6,107 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.net.*;
+import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.net.*;
+import javax.imageio.ImageIO;
 
 public class ServerForm extends JFrame {
     private JTextArea logArea;
     private JButton startServerButton;
     private JLabel ipLabel;
     private ServerSocket serverSocket;
-    private ExecutorService executor;
+    private Socket clientSocket;
+    private ObjectOutputStream outputStream;
+    private ObjectInputStream inputStream;
     private static final int PORT = 5000;
     private static final String PASSWORD = "123456";
 
     public ServerForm() {
         setTitle("Remote Desktop Server");
-        setSize(400, 300);
+        setSize(500, 400);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Khu vực log
+        // Log Area
         logArea = new JTextArea();
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
 
-        // Nút Start Server
+        // Start Server Button
         startServerButton = new JButton("Start Server");
-        startServerButton.addActionListener(new StartServerAction());
+        startServerButton.addActionListener(e -> startServer());
 
-        // Nhãn hiển thị IP
+        // IP Label
         ipLabel = new JLabel("IP: Chưa khởi động", SwingConstants.CENTER);
 
-        // Sắp xếp giao diện
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(ipLabel, BorderLayout.NORTH);
-        topPanel.add(startServerButton, BorderLayout.CENTER);
-
-        add(topPanel, BorderLayout.NORTH);
+        add(ipLabel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
+        add(startServerButton, BorderLayout.SOUTH);
+    }
 
-        executor = Executors.newFixedThreadPool(10); // Xử lý đa luồng
+    private void startServer() {
+        startServerButton.setEnabled(false);
+        new Thread(() -> {
+            try {
+                String ipAddress = InetAddress.getLocalHost().getHostAddress();
+                ipLabel.setText("IP: " + ipAddress);
+                logArea.append("Server đang chạy trên IP: " + ipAddress + ", cổng: " + PORT + "\n");
+
+                serverSocket = new ServerSocket(PORT);
+                clientSocket = serverSocket.accept();
+                logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
+
+                outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                inputStream = new ObjectInputStream(clientSocket.getInputStream());
+
+                authenticateClient();
+                handleClientCommands();
+            } catch (Exception e) {
+                logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
+            }
+        }).start();
+    }
+
+    private void authenticateClient() throws IOException, ClassNotFoundException {
+        String receivedPassword = (String) inputStream.readObject();
+        logArea.append("Mật khẩu nhận được: " + receivedPassword + "\n");
+
+        if (!PASSWORD.equals(receivedPassword)) {
+            logArea.append("Xác thực thất bại\n");
+            outputStream.writeObject("Xác thực thất bại");
+            clientSocket.close();
+            throw new SecurityException("Sai mật khẩu");
+        }
+
+        logArea.append("Xác thực thành công\n");
+        outputStream.writeObject("Máy khách xác thực thành công");
+    }
+
+    private void handleClientCommands() {
+        try {
+            Robot robot = new Robot();
+
+            while (true) {
+                String command = (String) inputStream.readObject();
+                if (command.startsWith("mouse")) {
+                    String[] parts = command.split(",");
+                    int x = Integer.parseInt(parts[1]);
+                    int y = Integer.parseInt(parts[2]);
+                    robot.mouseMove(x, y);
+                } else if (command.equals("click")) {
+                    robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+                    robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                } else if (command.startsWith("key")) {
+                    int keyCode = Integer.parseInt(command.split(",")[1]);
+                    robot.keyPress(keyCode);
+                    robot.keyRelease(keyCode);
+                }
+            }
+        } catch (Exception e) {
+            logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
+        }
     }
 
     public static void main(String[] args) {
@@ -57,78 +115,4 @@ public class ServerForm extends JFrame {
             serverForm.setVisible(true);
         });
     }
-
-    private class StartServerAction implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            startServerButton.setEnabled(false);
-            new Thread(() -> startServer()).start();
-        }
-    }
-
-    private void startServer() {
-        try {
-            // Lấy địa chỉ IP của máy
-            String localIp = getLocalIpAddress();
-            ipLabel.setText("IP: " + localIp); // Hiển thị IP lên giao diện
-            logArea.append("Server đang chạy trên IP: " + localIp + ", cổng: " + PORT + "\n");
-
-            serverSocket = new ServerSocket(PORT);
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                logArea.append("Máy khách kết nối từ: " + clientSocket.getInetAddress() + "\n");
-                executor.execute(() -> handleClient(clientSocket));
-            }
-        } catch (IOException e) {
-            logArea.append("Lỗi: " + e.getMessage() + "\n");
-        }
-    }
-
-    private void handleClient(Socket clientSocket) {
-        try (
-            ObjectOutputStream outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
-            ObjectInputStream inputStream = new ObjectInputStream(clientSocket.getInputStream())
-        ) {
-            // Xác thực mật khẩu
-            String receivedPassword = (String) inputStream.readObject();
-            if (!PASSWORD.equals(receivedPassword)) {
-                logArea.append("Sai mật khẩu từ: " + clientSocket.getInetAddress() + "\n");
-                outputStream.writeObject("Sai mật khẩu. Kết nối bị từ chối.");
-                clientSocket.close();
-                return;
-            }
-
-            logArea.append("Máy khách xác thực thành công: " + clientSocket.getInetAddress() + "\n");
-            outputStream.writeObject("Kết nối thành công!");
-
-            // Xử lý lệnh từ Client
-            handleRemoteCommands(inputStream);
-        } catch (Exception e) {
-            logArea.append("Máy khách ngắt kết nối: " + e.getMessage() + "\n");
-        }
-    }
-
-    private void handleRemoteCommands(ObjectInputStream inputStream) {
-        try {
-            while (true) {
-                String command = (String) inputStream.readObject();
-                logArea.append("Lệnh nhận được: " + command + "\n");
-                // Xử lý lệnh tại đây
-            }
-        } catch (Exception e) {
-            logArea.append("Kết nối lệnh bị ngắt: " + e.getMessage() + "\n");
-        }
-    }
-
-    // Hàm lấy địa chỉ IP của máy
-    private String getLocalIpAddress() {
-        try {
-            InetAddress localAddress = InetAddress.getLocalHost();
-            return localAddress.getHostAddress();
-        } catch (UnknownHostException e) {
-            return "Không xác định được IP";
-        }
-    }
 }
-
-

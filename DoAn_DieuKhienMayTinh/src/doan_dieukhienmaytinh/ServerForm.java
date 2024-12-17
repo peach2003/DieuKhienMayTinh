@@ -62,6 +62,7 @@ public class ServerForm extends JFrame {
                 inputStream = new ObjectInputStream(clientSocket.getInputStream());
 
                 authenticateClient();
+                sendScreenToClient();
                 handleClientCommands();
             } catch (Exception e) {
                 logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
@@ -84,29 +85,55 @@ public class ServerForm extends JFrame {
         outputStream.writeObject("Máy khách xác thực thành công");
     }
 
-    private void handleClientCommands() {
-        try {
-            Robot robot = new Robot();
+    private void sendScreenToClient() {
+        new Thread(() -> {
+            try {
+                Robot robot = new Robot();
+                Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
-            while (true) {
-                String command = (String) inputStream.readObject();
-                if (command.startsWith("mouse")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.equals("click")) {
-                    robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-                    robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
-                } else if (command.startsWith("key")) {
-                    int keyCode = Integer.parseInt(command.split(",")[1]);
-                    robot.keyPress(keyCode);
-                    robot.keyRelease(keyCode);
+                while (true) {
+                    // Chụp màn hình
+                    BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
+                    byte[] imageBytes = byteArrayOutputStream.toByteArray();
+
+                    // Gửi màn hình cho Client
+                    outputStream.writeObject(imageBytes);
+                    outputStream.flush();
+                    Thread.sleep(100); // Điều chỉnh tốc độ truyền
                 }
+            } catch (Exception e) {
+                logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
             }
-        } catch (Exception e) {
-            logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
-        }
+        }).start();
+    }
+
+    private void handleClientCommands() {
+        new Thread(() -> {
+            try {
+                Robot robot = new Robot();
+
+                while (true) {
+                    String command = (String) inputStream.readObject();
+                    if (command.startsWith("mouse")) {
+                        String[] parts = command.split(",");
+                        int x = Integer.parseInt(parts[1]);
+                        int y = Integer.parseInt(parts[2]);
+                        robot.mouseMove(x, y);
+                    } else if (command.equals("click")) {
+                        robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+                        robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                    } else if (command.startsWith("key")) {
+                        int keyCode = Integer.parseInt(command.split(",")[1]);
+                        robot.keyPress(keyCode);
+                        robot.keyRelease(keyCode);
+                    }
+                }
+            } catch (Exception e) {
+                logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
+            }
+        }).start();
     }
 
     public static void main(String[] args) {

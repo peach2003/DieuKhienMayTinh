@@ -1,12 +1,9 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
 import javax.imageio.ImageIO;
@@ -22,7 +19,7 @@ public class ClientForm extends JFrame {
 
     public ClientForm() {
         setTitle("Remote Desktop Client");
-        setSize(800, 600);
+        setSize(1000, 700);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
@@ -74,7 +71,14 @@ public class ClientForm extends JFrame {
             while (true) {
                 byte[] imageBytes = (byte[]) inputStream.readObject();
                 ImageIcon icon = new ImageIcon(imageBytes);
-                screenLabel.setIcon(icon);
+
+                // Lấy kích thước khung hiển thị
+                int width = screenLabel.getWidth();
+                int height = screenLabel.getHeight();
+
+                // Điều chỉnh kích thước ảnh theo khung hiển thị
+                Image scaledImage = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+                screenLabel.setIcon(new ImageIcon(scaledImage));
                 screenLabel.repaint();
             }
         } catch (Exception e) {
@@ -87,9 +91,7 @@ public class ClientForm extends JFrame {
             @Override
             public void mouseMoved(MouseEvent e) {
                 try {
-                    int x = e.getX();
-                    int y = e.getY();
-                    outputStream.writeObject("mouse," + x + "," + y);
+                    outputStream.writeObject("mouse," + e.getX() + "," + e.getY());
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
@@ -111,8 +113,7 @@ public class ClientForm extends JFrame {
             @Override
             public void keyPressed(KeyEvent e) {
                 try {
-                    int keyCode = e.getKeyCode();
-                    outputStream.writeObject("key," + keyCode);
+                    outputStream.writeObject("key," + e.getKeyCode());
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }

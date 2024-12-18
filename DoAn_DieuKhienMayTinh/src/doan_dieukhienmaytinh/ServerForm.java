@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package doan_dieukhienmaytinh;
 
 import javax.swing.*;
@@ -14,7 +10,6 @@ import javax.imageio.ImageIO;
 
 public class ServerForm extends JFrame {
     private JTextArea logArea;
-    private JButton startServerButton;
     private JLabel ipLabel;
     private ServerSocket serverSocket;
     private Socket clientSocket;
@@ -34,20 +29,17 @@ public class ServerForm extends JFrame {
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
 
-        // Start Server Button
-        startServerButton = new JButton("Start Server");
-        startServerButton.addActionListener(e -> startServer());
-
         // IP Label
-        ipLabel = new JLabel("IP: Chưa khởi động", SwingConstants.CENTER);
+        ipLabel = new JLabel("IP: Đang khởi động...", SwingConstants.CENTER);
 
         add(ipLabel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
-        add(startServerButton, BorderLayout.SOUTH);
+
+        // Tự động khởi động Server
+        startServer();
     }
 
     private void startServer() {
-        startServerButton.setEnabled(false);
         new Thread(() -> {
             try {
                 String ipAddress = InetAddress.getLocalHost().getHostAddress();
@@ -62,6 +54,7 @@ public class ServerForm extends JFrame {
                 inputStream = new ObjectInputStream(clientSocket.getInputStream());
 
                 authenticateClient();
+                new Thread(this::sendScreenToClient).start(); // Gửi màn hình liên tục
                 handleClientCommands();
             } catch (Exception e) {
                 logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
@@ -82,6 +75,26 @@ public class ServerForm extends JFrame {
 
         logArea.append("Xác thực thành công\n");
         outputStream.writeObject("Máy khách xác thực thành công");
+    }
+
+    private void sendScreenToClient() {
+        try {
+            Robot robot = new Robot();
+            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+            while (true) {
+                BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
+                byte[] imageBytes = byteArrayOutputStream.toByteArray();
+
+                outputStream.writeObject(imageBytes);
+                outputStream.flush();
+                Thread.sleep(100); // Điều chỉnh tốc độ truyền
+            }
+        } catch (Exception e) {
+            logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
+        }
     }
 
     private void handleClientCommands() {

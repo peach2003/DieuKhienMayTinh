@@ -27,9 +27,13 @@ public class ClientForm extends JFrame {
         serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
+        JButton sendFileButton = new JButton("Gửi File");
+
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
+        topPanel.add(sendFileButton);
+
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -38,6 +42,8 @@ public class ClientForm extends JFrame {
         add(screenLabel, BorderLayout.CENTER);
 
         connectButton.addActionListener(e -> connectToServer());
+        sendFileButton.addActionListener(e -> sendFile());
+
     }
 
     private void connectToServer() {
@@ -121,6 +127,39 @@ public class ClientForm extends JFrame {
         });
     }
 
+    private void sendFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        int returnValue = fileChooser.showOpenDialog(this);
+
+        if (returnValue == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+
+            try {
+                // Gửi lệnh gửi file
+                outputStream.writeObject("sendfile");
+
+                // Gửi tên file
+                outputStream.writeObject(file.getName());
+
+                // Gửi kích thước file
+                long fileSize = file.length();
+                outputStream.writeLong(fileSize);
+
+                // Gửi nội dung file
+                byte[] buffer = new byte[1024];
+                try (FileInputStream fileInputStream = new FileInputStream(file)) {
+                    int bytesRead;
+                    while ((bytesRead = fileInputStream.read(buffer)) > 0) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                }
+                outputStream.flush();
+                JOptionPane.showMessageDialog(this, "File đã được gửi!");
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+            }
+        }
+    }
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             ClientForm clientForm = new ClientForm();

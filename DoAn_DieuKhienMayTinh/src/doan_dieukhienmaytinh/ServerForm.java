@@ -115,10 +115,63 @@ public class ServerForm extends JFrame {
                     int keyCode = Integer.parseInt(command.split(",")[1]);
                     robot.keyPress(keyCode);
                     robot.keyRelease(keyCode);
-                }
+                }else if (command.equals("sendfile")) {
+                receiveFileFromClient();
+            }
+
             }
         } catch (Exception e) {
             logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
+        }
+    }
+    private void receiveFileFromClient() {
+    try {
+        // Nhận tên file
+        String fileName = (String) inputStream.readObject();
+
+        // Nhận kích thước file
+        long fileSize = inputStream.readLong();
+
+        // Nhận dữ liệu file
+        byte[] buffer = new byte[1024];
+        try (FileOutputStream fos = new FileOutputStream("received_" + fileName)) {
+            long bytesReceived = 0;
+            while (bytesReceived < fileSize) {
+                int bytesRead = inputStream.read(buffer);
+                fos.write(buffer, 0, bytesRead);
+                bytesReceived += bytesRead;
+            }
+        }
+
+        logArea.append("Đã nhận file: " + fileName + "\n");
+    } catch (Exception e) {
+        logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
+    }
+}
+
+    private void sendFileToClient(String fileName) {
+        try {
+            File file = new File(fileName);
+            if (!file.exists()) {
+                outputStream.writeObject("ERROR: File không tồn tại");
+                return;
+            }
+
+            // Gửi file
+            byte[] fileBytes = new byte[(int) file.length()];
+            try (FileInputStream fis = new FileInputStream(file)) {
+                fis.read(fileBytes);
+            }
+
+            // Gửi tên file và nội dung file
+            outputStream.writeObject("FILE_START");
+            outputStream.writeObject(file.getName()); // Gửi tên file
+            outputStream.writeObject(fileBytes);     // Gửi dữ liệu file
+            outputStream.writeObject("FILE_END");
+
+            logArea.append("Đã gửi file: " + fileName + " đến máy khách.\n");
+        } catch (Exception e) {
+            logArea.append("Lỗi khi gửi file: " + e.getMessage() + "\n");
         }
     }
 

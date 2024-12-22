@@ -178,33 +178,40 @@ public class ClientForm extends JFrame {
     }
 
     private void sendFile() {
-        JFileChooser fileChooser = new JFileChooser();
-        int result = fileChooser.showOpenDialog(this);
+    JFileChooser fileChooser = new JFileChooser();
+    int result = fileChooser.showOpenDialog(this);
 
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            try {
-                outputStream.writeObject("sendFile");
-                outputStream.writeObject(selectedFile.getName());
-                outputStream.writeLong(selectedFile.length());
+    if (result == JFileChooser.APPROVE_OPTION) {
+        File selectedFile = fileChooser.getSelectedFile();
+        try {
+            // Gửi lệnh "sendFile"
+            outputStream.writeObject("sendFile");
 
-                FileInputStream fis = new FileInputStream(selectedFile);
-                byte[] buffer = new byte[4096];
-                int bytesRead;
+            // Gửi tên file và kích thước file
+            outputStream.writeObject(selectedFile.getName());
+            outputStream.writeLong(selectedFile.length());
 
-                while ((bytesRead = fis.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-                fis.close();
-                outputStream.flush();
+            // Gửi dữ liệu file
+            FileInputStream fis = new FileInputStream(selectedFile);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            long totalSent = 0;
 
-                String response = (String) inputStream.readObject();
-                JOptionPane.showMessageDialog(this, response);
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+                totalSent += bytesRead;
             }
+            fis.close();
+            outputStream.flush();
+
+            // Đọc phản hồi từ Server
+            String response = (String) inputStream.readObject();
+            JOptionPane.showMessageDialog(this, response);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
         }
     }
+}
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {

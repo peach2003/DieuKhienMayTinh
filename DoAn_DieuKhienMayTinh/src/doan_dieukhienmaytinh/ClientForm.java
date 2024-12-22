@@ -2,11 +2,7 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 
@@ -18,7 +14,6 @@ public class ClientForm extends JFrame {
     private Socket socket;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
-    private boolean connected = false;
     private int screenWidthServer;
     private int screenHeightServer;
 
@@ -42,27 +37,10 @@ public class ClientForm extends JFrame {
         add(topPanel, BorderLayout.NORTH);
         add(screenLabel, BorderLayout.CENTER);
 
-        connectButton.addActionListener(e -> {
-            if (connected) {
-                try {
-                    disconnectFromServer();
-                    connectButton.setText("Connect");
-                    JOptionPane.showMessageDialog(this, "Disconnected successfully.");
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(this, "Error while disconnecting: " + ex.getMessage());
-                }
-            } else {
-                if (connectToServer()) {
-                    connectButton.setText("Disconnect");
-                    JOptionPane.showMessageDialog(this, "Connected successfully.");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Failed to connect. Please check the server IP and try again.");
-                }
-            }
-        });
+        connectButton.addActionListener(e -> connectToServer());
     }
 
-    public boolean connectToServer() {
+    private void connectToServer() {
         String serverIp = serverIpField.getText();
         String password = new String(passwordField.getPassword());
 
@@ -81,33 +59,20 @@ public class ClientForm extends JFrame {
             if (!response.equals("Máy khách xác thực thành công")) {
                 JOptionPane.showMessageDialog(this, "Xác thực thất bại!");
                 socket.close();
-                return false;
+                return;
             }
 
-            connected = true;
+            JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             new Thread(this::receiveScreen).start();
             setupControlListeners();
-            return true;
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Lỗi kết nối: " + e.getMessage());
-            return false;
         }
-    }
-
-    public void disconnectFromServer() throws IOException {
-        if (socket != null && !socket.isClosed()) {
-            socket.close();
-        }
-        connected = false;
-    }
-
-    public boolean isConnected() {
-        return connected;
     }
 
     private void receiveScreen() {
         try {
-            while (connected) {
+            while (true) {
                 byte[] imageBytes = (byte[]) inputStream.readObject();
                 ImageIcon icon = new ImageIcon(imageBytes);
 
@@ -120,7 +85,6 @@ public class ClientForm extends JFrame {
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Mất kết nối với Server!");
-            connected = false;
         }
     }
 
@@ -171,10 +135,6 @@ public class ClientForm extends JFrame {
         } catch (IOException ex) {
             ex.printStackTrace();
         }
-    }
-
-    public JButton getConnectButton() {
-        return connectButton;
     }
 
     public static void main(String[] args) {

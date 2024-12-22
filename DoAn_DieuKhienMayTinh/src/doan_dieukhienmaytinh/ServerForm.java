@@ -104,53 +104,6 @@ public class ServerForm extends JFrame {
         }
     }
 
-    private void handleFileTransfer() {
-    try {
-        // Đọc tên file từ Client
-        String fileName = (String) inputStream.readObject();
-        logArea.append("Yêu cầu nhận file: " + fileName + "\n");
-
-        // Xác nhận nhận file
-        int response = JOptionPane.showConfirmDialog(this,
-                "Nhận file: " + fileName + "?",
-                "Xác nhận nhận file",
-                JOptionPane.YES_NO_OPTION);
-        if (response == JOptionPane.YES_OPTION) {
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setSelectedFile(new File(fileName));
-            int userSelection = fileChooser.showSaveDialog(this);
-            if (userSelection == JFileChooser.APPROVE_OPTION) {
-                File fileToSave = fileChooser.getSelectedFile();
-
-                // Nhận kích thước file
-                long fileSize = inputStream.readLong();
-                logArea.append("Kích thước file: " + fileSize + " bytes\n");
-
-                // Nhận dữ liệu file
-                FileOutputStream fos = new FileOutputStream(fileToSave);
-                byte[] buffer = new byte[4096];
-                long totalRead = 0;
-                int bytesRead;
-
-                while (totalRead < fileSize && (bytesRead = inputStream.read(buffer)) != -1) {
-                    fos.write(buffer, 0, bytesRead);
-                    totalRead += bytesRead;
-                }
-                fos.close();
-
-                logArea.append("File đã nhận: " + fileToSave.getAbsolutePath() + "\n");
-                outputStream.writeObject("File đã nhận thành công");
-            } else {
-                outputStream.writeObject("Đã từ chối nhận file");
-            }
-        } else {
-            outputStream.writeObject("Đã từ chối nhận file");
-        }
-    } catch (Exception e) {
-        logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
-    }
-}
-
     private void handleClientCommands() {
         try {
             Robot robot = new Robot();
@@ -161,9 +114,7 @@ public class ServerForm extends JFrame {
                     logArea.append("Máy khách đã ngắt kết nối\n");
                     break;
                 }
-                if ("sendFile".equals(command)) {
-                    handleFileTransfer();
-                } else if (command.startsWith("mouse")) {
+                if (command.startsWith("mouse")) {
                     String[] parts = command.split(",");
                     int x = Integer.parseInt(parts[1]);
                     int y = Integer.parseInt(parts[2]);

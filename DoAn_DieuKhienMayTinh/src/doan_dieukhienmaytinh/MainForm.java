@@ -6,8 +6,6 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 public class MainForm extends JFrame {
@@ -116,8 +114,6 @@ public class MainForm extends JFrame {
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Connection Error: Unable to connect to " + targetIp);
                 logMessage("Connection failed: " + e.getMessage());
-            } catch (ClassNotFoundException ex) {
-                Logger.getLogger(MainForm.class.getName()).log(Level.SEVERE, null, ex);
             }
         }).start();
     }
@@ -140,7 +136,13 @@ public class MainForm extends JFrame {
 
     private void authenticateServer(String password) throws IOException, ClassNotFoundException {
         outputStream.writeObject(password);
-        String[] screenSize = ((String) inputStream.readObject()).split(",");
+        String screenSizeData = (String) inputStream.readObject();
+        String[] screenSize = screenSizeData.split(",");
+
+        if (screenSize.length < 2) {
+            throw new IOException("Invalid screen size data received: " + screenSizeData);
+        }
+
         screenWidthServer = Integer.parseInt(screenSize[0]);
         screenHeightServer = Integer.parseInt(screenSize[1]);
         JOptionPane.showMessageDialog(this, "Connected Successfully!");

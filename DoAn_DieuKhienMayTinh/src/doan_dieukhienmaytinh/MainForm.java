@@ -6,6 +6,8 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 public class MainForm extends JFrame {
@@ -37,13 +39,36 @@ public class MainForm extends JFrame {
         serverPanel.add(serverPasswordLabel);
 
         // Right Panel for Client Input
-        JPanel clientPanel = new JPanel(new GridLayout(3, 1));
+        JPanel clientPanel = new JPanel();
+        clientPanel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
         targetIpField = new JTextField("Enter Target IP");
+        targetIpField.setPreferredSize(new Dimension(150, 25));
         targetPasswordField = new JPasswordField("123456");
+        targetPasswordField.setPreferredSize(new Dimension(150, 25));
         connectButton = new JButton("Connect");
-        clientPanel.add(targetIpField);
-        clientPanel.add(targetPasswordField);
-        clientPanel.add(connectButton);
+        connectButton.setPreferredSize(new Dimension(100, 30));
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        clientPanel.add(new JLabel("Target IP:"), gbc);
+        gbc.gridx = 1;
+        clientPanel.add(targetIpField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        clientPanel.add(new JLabel("Password:"), gbc);
+        gbc.gridx = 1;
+        clientPanel.add(targetPasswordField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        clientPanel.add(connectButton, gbc);
 
         add(serverPanel);
         add(clientPanel);
@@ -60,7 +85,9 @@ public class MainForm extends JFrame {
                 String ipAddress = InetAddress.getLocalHost().getHostAddress();
                 serverIpLabel.setText("Server IP: " + ipAddress);
                 while (true) {
+                    logMessage("Server is listening on port " + PORT);
                     socket = serverSocket.accept();
+                    logMessage("Client connected: " + socket.getInetAddress());
                     setupStreams();
                     authenticateClient();
                 }
@@ -71,17 +98,28 @@ public class MainForm extends JFrame {
     }
 
     private void connectToTarget() {
-        String targetIp = targetIpField.getText();
+        String targetIp = targetIpField.getText().trim();
         String password = new String(targetPasswordField.getPassword());
 
-        try {
-            socket = new Socket(targetIp, PORT);
-            setupStreams();
-            authenticateServer(password);
-            openControlForm();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Connection Error: " + e.getMessage());
+        if (targetIp.isEmpty() || password.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter valid IP and password!");
+            return;
         }
+
+        new Thread(() -> {
+            try {
+                logMessage("Connecting to " + targetIp + " on port " + PORT);
+                socket = new Socket(targetIp, PORT);
+                setupStreams();
+                authenticateServer(password);
+                openControlForm();
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Connection Error: Unable to connect to " + targetIp);
+                logMessage("Connection failed: " + e.getMessage());
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(MainForm.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }).start();
     }
 
     private void setupStreams() throws IOException {
@@ -95,6 +133,9 @@ public class MainForm extends JFrame {
         if (!response.equals("Client authenticated")) {
             throw new SecurityException("Authentication Failed");
         }
+
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        outputStream.writeObject(screenSize.width + "," + screenSize.height);
     }
 
     private void authenticateServer(String password) throws IOException, ClassNotFoundException {
@@ -106,8 +147,14 @@ public class MainForm extends JFrame {
     }
 
     private void openControlForm() {
-        new ControlForm(socket, outputStream, inputStream, screenWidthServer, screenHeightServer).setVisible(true);
-        this.dispose();
+        SwingUtilities.invokeLater(() -> {
+            new ControlForm(socket, outputStream, inputStream, screenWidthServer, screenHeightServer).setVisible(true);
+            this.dispose();
+        });
+    }
+
+    private void logMessage(String message) {
+        System.out.println(message);
     }
 
     public static void main(String[] args) {
@@ -143,6 +190,7 @@ class ControlForm extends JFrame {
         JPanel controlsPanel = new JPanel(new BorderLayout());
         JButton toggleControlsButton = new JButton("\u25BC"); // Arrow down
         disconnectButton = new JButton("Disconnect");
+        disconnectButton.setPreferredSize(new Dimension(100, 30));
         disconnectButton.setVisible(false);
 
         controlsPanel.add(toggleControlsButton, BorderLayout.NORTH);
@@ -163,6 +211,9 @@ class ControlForm extends JFrame {
         try {
             while (true) {
                 byte[] imageBytes = (byte[]) inputStream.readObject();
+                if (imageBytes == null || imageBytes.length == 0) {
+                    throw new IOException("Received empty screen data");
+                }
                 ImageIcon icon = new ImageIcon(imageBytes);
                 int width = screenLabel.getWidth();
                 int height = screenLabel.getHeight();
@@ -171,7 +222,7 @@ class ControlForm extends JFrame {
                 screenLabel.repaint();
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Connection Lost!");
+            JOptionPane.showMessageDialog(this, "Connection Lost: " + e.getMessage());
             disconnect();
         }
     }
@@ -179,9 +230,11 @@ class ControlForm extends JFrame {
     private void disconnect() {
         try {
             if (socket != null) socket.close();
+            System.out.println("Disconnected successfully");
             JOptionPane.showMessageDialog(this, "Disconnected Successfully!");
             System.exit(0);
         } catch (IOException e) {
+            System.err.println("Error while disconnecting: " + e.getMessage());
             JOptionPane.showMessageDialog(this, "Error Disconnecting: " + e.getMessage());
         }
     }

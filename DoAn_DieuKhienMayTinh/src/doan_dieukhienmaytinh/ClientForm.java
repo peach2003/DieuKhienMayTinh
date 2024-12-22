@@ -12,6 +12,7 @@ public class ClientForm extends JFrame {
     private JButton connectButton;
     private JLabel screenLabel;
     private Socket socket;
+    private JButton sendFileButton;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     private int screenWidthServer;
@@ -27,9 +28,11 @@ public class ClientForm extends JFrame {
         serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
+        sendFileButton = new JButton("Send File");
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
+        topPanel.add(sendFileButton);
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -44,6 +47,7 @@ public class ClientForm extends JFrame {
                 disconnectFromServer();
             }
         });
+        sendFileButton.addActionListener(e -> sendFileToServer());
     }
 
     private void connectToServer() {
@@ -165,6 +169,25 @@ public class ClientForm extends JFrame {
             outputStream.writeObject(event);
         } catch (IOException ex) {
             ex.printStackTrace();
+        }
+    }
+    private void sendFileToServer() {
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            try (FileInputStream fileInputStream = new FileInputStream(file)) {
+                byte[] fileData = fileInputStream.readAllBytes();
+
+                outputStream.writeObject("sendFile");
+                outputStream.writeObject(file.getName());
+                outputStream.writeObject(fileData);
+
+                JOptionPane.showMessageDialog(this, "Đã gửi file: " + file.getName());
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+            }
         }
     }
 

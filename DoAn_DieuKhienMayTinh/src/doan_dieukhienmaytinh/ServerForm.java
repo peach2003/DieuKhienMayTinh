@@ -139,6 +139,31 @@ public class ServerForm extends JFrame {
             logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
         }
     }
+    private void handleFileReception() {
+        try {
+            String fileName = (String) inputStream.readObject();
+            byte[] fileData = (byte[]) inputStream.readObject();
+
+            int confirm = JOptionPane.showConfirmDialog(this, "Bạn có muốn nhận file \"" + fileName + "\" không?", "Nhận File", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setSelectedFile(new File(fileName));
+                int result = fileChooser.showSaveDialog(this);
+
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File file = fileChooser.getSelectedFile();
+                    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+                        fileOutputStream.write(fileData);
+                        logArea.append("File đã lưu: " + file.getAbsolutePath() + "\n");
+                    }
+                }
+            } else {
+                logArea.append("Đã từ chối nhận file \"" + fileName + "\"\n");
+            }
+        } catch (Exception e) {
+            logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
+        }
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {

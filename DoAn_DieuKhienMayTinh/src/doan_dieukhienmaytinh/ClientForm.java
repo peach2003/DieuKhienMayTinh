@@ -37,7 +37,13 @@ public class ClientForm extends JFrame {
         add(topPanel, BorderLayout.NORTH);
         add(screenLabel, BorderLayout.CENTER);
 
-        connectButton.addActionListener(e -> connectToServer());
+        connectButton.addActionListener(e -> {
+            if ("Connect".equals(connectButton.getText())) {
+                connectToServer();
+            } else {
+                disconnectFromServer();
+            }
+        });
     }
 
     private void connectToServer() {
@@ -63,10 +69,26 @@ public class ClientForm extends JFrame {
             }
 
             JOptionPane.showMessageDialog(this, "Kết nối thành công!");
+            connectButton.setText("Disconnect");
             new Thread(this::receiveScreen).start();
             setupControlListeners();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Lỗi kết nối: " + e.getMessage());
+        }
+    }
+
+    private void disconnectFromServer() {
+        try {
+            if (socket != null && !socket.isClosed()) {
+                outputStream.writeObject("disconnect");
+                socket.close();
+            }
+            JOptionPane.showMessageDialog(this, "Đã ngắt kết nối.");
+            connectButton.setText("Connect");
+            screenLabel.setIcon(null);
+            dispose(); // Close the client form
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Lỗi khi ngắt kết nối: " + e.getMessage());
         }
     }
 
@@ -85,6 +107,7 @@ public class ClientForm extends JFrame {
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Mất kết nối với Server!");
+            disconnectFromServer();
         }
     }
 
@@ -92,26 +115,34 @@ public class ClientForm extends JFrame {
         screenLabel.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                sendMouseEvent("mouse", e.getX(), e.getY());
+                if (socket != null && !socket.isClosed()) {
+                    sendMouseEvent("mouse", e.getX(), e.getY());
+                }
             }
 
             @Override
             public void mouseDragged(MouseEvent e) {
-                sendMouseEvent("drag", e.getX(), e.getY());
+                if (socket != null && !socket.isClosed()) {
+                    sendMouseEvent("drag", e.getX(), e.getY());
+                }
             }
         });
 
         screenLabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                sendEvent("click");
+                if (socket != null && !socket.isClosed()) {
+                    sendEvent("click");
+                }
             }
         });
 
         screenLabel.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                sendEvent("key," + e.getKeyCode());
+                if (socket != null && !socket.isClosed()) {
+                    sendEvent("key," + e.getKeyCode());
+                }
             }
         });
 

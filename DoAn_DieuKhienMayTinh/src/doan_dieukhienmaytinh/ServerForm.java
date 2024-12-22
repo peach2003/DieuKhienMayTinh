@@ -44,16 +44,18 @@ public class ServerForm extends JFrame {
                 logArea.append("Server đang chạy trên IP: " + ipAddress + ", cổng: " + PORT + "\n");
 
                 serverSocket = new ServerSocket(PORT);
-                clientSocket = serverSocket.accept();
-                logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
+                while (true) {
+                    clientSocket = serverSocket.accept();
+                    logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
 
-                outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
-                inputStream = new ObjectInputStream(clientSocket.getInputStream());
+                    outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                    inputStream = new ObjectInputStream(clientSocket.getInputStream());
 
-                sendScreenSize();
-                authenticateClient();
-                new Thread(this::sendScreenToClient).start();
-                handleClientCommands();
+                    sendScreenSize();
+                    authenticateClient();
+                    new Thread(this::sendScreenToClient).start();
+                    handleClientCommands();
+                }
             } catch (Exception e) {
                 logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
             }
@@ -95,6 +97,8 @@ public class ServerForm extends JFrame {
                 outputStream.flush();
                 Thread.sleep(100); // Điều chỉnh tốc độ gửi
             }
+        } catch (SocketException se) {
+            logArea.append("Kết nối với client đã bị đóng.\n");
         } catch (Exception e) {
             logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
         }
@@ -106,6 +110,10 @@ public class ServerForm extends JFrame {
 
             while (true) {
                 String command = (String) inputStream.readObject();
+                if ("disconnect".equals(command)) {
+                    logArea.append("Máy khách đã ngắt kết nối\n");
+                    break;
+                }
                 if (command.startsWith("mouse")) {
                     String[] parts = command.split(",");
                     int x = Integer.parseInt(parts[1]);
@@ -125,6 +133,8 @@ public class ServerForm extends JFrame {
                     robot.keyRelease(keyCode);
                 }
             }
+        } catch (SocketException se) {
+            logArea.append("Kết nối với client đã bị đóng.\n");
         } catch (Exception e) {
             logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
         }

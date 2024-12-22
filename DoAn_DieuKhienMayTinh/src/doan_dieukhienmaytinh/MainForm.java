@@ -3,7 +3,6 @@ package doan_dieukhienmaytinh;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
 import javax.imageio.ImageIO;
@@ -114,6 +113,9 @@ public class MainForm extends JFrame {
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Connection Error: Unable to connect to " + targetIp);
                 logMessage("Connection failed: " + e.getMessage());
+            } catch (ClassNotFoundException e) {
+                JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+                logMessage("ClassNotFoundException: " + e.getMessage());
             }
         }).start();
     }

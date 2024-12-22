@@ -139,30 +139,53 @@ public class ServerForm extends JFrame {
             logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
         }
     }
-    private void handleFileReception() {
-        try {
-            String fileName = (String) inputStream.readObject();
-            byte[] fileData = (byte[]) inputStream.readObject();
+    private void handleClient(Socket clientSocket) {
+        new Thread(() -> {
+            try (
+                DataInputStream input = new DataInputStream(clientSocket.getInputStream());
+                DataOutputStream output = new DataOutputStream(clientSocket.getOutputStream());
+            ) {
+                // Nhận tên file từ Client
+                String fileName = input.readUTF();
+                logArea.append("File request received: " + fileName + "\n");
 
-            int confirm = JOptionPane.showConfirmDialog(this, "Bạn có muốn nhận file \"" + fileName + "\" không?", "Nhận File", JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
+                // Xác nhận nhận file
+                int confirm = JOptionPane.showConfirmDialog(this, "Receive file \"" + fileName + "\"?", "File Transfer", JOptionPane.YES_NO_OPTION);
+                output.writeBoolean(confirm == JOptionPane.YES_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) {
+                    logArea.append("File transfer rejected.\n");
+                    return;
+                }
+
+                // Chọn vị trí lưu file
                 JFileChooser fileChooser = new JFileChooser();
                 fileChooser.setSelectedFile(new File(fileName));
                 int result = fileChooser.showSaveDialog(this);
-
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File file = fileChooser.getSelectedFile();
-                    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-                        fileOutputStream.write(fileData);
-                        logArea.append("File đã lưu: " + file.getAbsolutePath() + "\n");
-                    }
+                if (result != JFileChooser.APPROVE_OPTION) {
+                    logArea.append("File transfer canceled by user.\n");
+                    output.writeBoolean(false);
+                    return;
                 }
-            } else {
-                logArea.append("Đã từ chối nhận file \"" + fileName + "\"\n");
+                output.writeBoolean(true);
+
+                File saveFile = fileChooser.getSelectedFile();
+                try (FileOutputStream fileOutput = new FileOutputStream(saveFile)) {
+                    long fileSize = input.readLong();
+                    byte[] buffer = new byte[4096];
+                    long totalRead = 0;
+
+                    logArea.append("Receiving file: " + fileName + " (" + fileSize + " bytes)\n");
+                    while (totalRead < fileSize) {
+                        int bytesRead = input.read(buffer);
+                        fileOutput.write(buffer, 0, bytesRead);
+                        totalRead += bytesRead;
+                    }
+                    logArea.append("File saved to: " + saveFile.getAbsolutePath() + "\n");
+                }
+            } catch (IOException e) {
+                logArea.append("Error while receiving file: " + e.getMessage() + "\n");
             }
-        } catch (Exception e) {
-            logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
-        }
+        }).start();
     }
 
     public static void main(String[] args) {

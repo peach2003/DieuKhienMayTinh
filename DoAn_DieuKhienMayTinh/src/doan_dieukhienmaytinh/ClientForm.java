@@ -177,16 +177,39 @@ public class ClientForm extends JFrame {
 
         if (result == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
-            try (FileInputStream fileInputStream = new FileInputStream(file)) {
-                byte[] fileData = fileInputStream.readAllBytes();
+            try (
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                FileInputStream fileInput = new FileInputStream(file);
+            ) {
+                // Gửi tên file
+                output.writeUTF(file.getName());
 
-                outputStream.writeObject("sendFile");
-                outputStream.writeObject(file.getName());
-                outputStream.writeObject(fileData);
+                // Kiểm tra server có chấp nhận không
+                boolean serverAccept = input.readBoolean();
+                if (!serverAccept) {
+                    JOptionPane.showMessageDialog(this, "File transfer rejected by server.");
+                    return;
+                }
 
-                JOptionPane.showMessageDialog(this, "Đã gửi file: " + file.getName());
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+                // Xác nhận vị trí lưu thành công
+                boolean pathAccept = input.readBoolean();
+                if (!pathAccept) {
+                    JOptionPane.showMessageDialog(this, "Server canceled file transfer.");
+                    return;
+                }
+
+                // Gửi dữ liệu file
+                long fileSize = file.length();
+                output.writeLong(fileSize);
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = fileInput.read(buffer)) != -1) {
+                    output.write(buffer, 0, bytesRead);
+                }
+                JOptionPane.showMessageDialog(this, "File sent successfully!");
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Error while sending file: " + e.getMessage());
             }
         }
     }

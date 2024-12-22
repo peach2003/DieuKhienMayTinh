@@ -3,10 +3,8 @@ package doan_dieukhienmaytinh;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
-import javax.imageio.ImageIO;
 
 public class ClientForm extends JFrame {
     private JTextField serverIpField;
@@ -16,6 +14,8 @@ public class ClientForm extends JFrame {
     private Socket socket;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
+    private int screenWidthServer;
+    private int screenHeightServer;
 
     public ClientForm() {
         setTitle("Remote Desktop Client");
@@ -49,6 +49,10 @@ public class ClientForm extends JFrame {
             outputStream = new ObjectOutputStream(socket.getOutputStream());
             inputStream = new ObjectInputStream(socket.getInputStream());
 
+            String[] screenSize = ((String) inputStream.readObject()).split(",");
+            screenWidthServer = Integer.parseInt(screenSize[0]);
+            screenHeightServer = Integer.parseInt(screenSize[1]);
+
             outputStream.writeObject(password);
 
             String response = (String) inputStream.readObject();
@@ -72,11 +76,9 @@ public class ClientForm extends JFrame {
                 byte[] imageBytes = (byte[]) inputStream.readObject();
                 ImageIcon icon = new ImageIcon(imageBytes);
 
-                // Lấy kích thước khung hiển thị
                 int width = screenLabel.getWidth();
                 int height = screenLabel.getHeight();
 
-                // Điều chỉnh kích thước ảnh theo khung hiển thị
                 Image scaledImage = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
                 screenLabel.setIcon(new ImageIcon(scaledImage));
                 screenLabel.repaint();
@@ -90,35 +92,49 @@ public class ClientForm extends JFrame {
         screenLabel.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                try {
-                    outputStream.writeObject("mouse," + e.getX() + "," + e.getY());
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                sendMouseEvent("mouse", e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                sendMouseEvent("drag", e.getX(), e.getY());
             }
         });
 
         screenLabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                try {
-                    outputStream.writeObject("click");
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                sendEvent("click");
             }
         });
 
         screenLabel.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                try {
-                    outputStream.writeObject("key," + e.getKeyCode());
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                sendEvent("key," + e.getKeyCode());
             }
         });
+
+        screenLabel.setFocusable(true);
+        screenLabel.requestFocusInWindow();
+    }
+
+    private void sendMouseEvent(String type, int x, int y) {
+        try {
+            int adjustedX = (x * screenWidthServer) / screenLabel.getWidth();
+            int adjustedY = (y * screenHeightServer) / screenLabel.getHeight();
+            outputStream.writeObject(type + "," + adjustedX + "," + adjustedY);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void sendEvent(String event) {
+        try {
+            outputStream.writeObject(event);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {

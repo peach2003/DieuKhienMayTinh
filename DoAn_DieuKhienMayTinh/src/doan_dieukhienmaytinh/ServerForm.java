@@ -2,7 +2,7 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
@@ -24,18 +24,15 @@ public class ServerForm extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Log Area
         logArea = new JTextArea();
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
 
-        // IP Label
         ipLabel = new JLabel("IP: Đang khởi động...", SwingConstants.CENTER);
 
         add(ipLabel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Tự động khởi động Server
         startServer();
     }
 
@@ -53,13 +50,19 @@ public class ServerForm extends JFrame {
                 outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
                 inputStream = new ObjectInputStream(clientSocket.getInputStream());
 
+                sendScreenSize();
                 authenticateClient();
-                new Thread(this::sendScreenToClient).start(); // Gửi màn hình liên tục
+                new Thread(this::sendScreenToClient).start();
                 handleClientCommands();
             } catch (Exception e) {
                 logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
             }
         }).start();
+    }
+
+    private void sendScreenSize() throws IOException {
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        outputStream.writeObject(screenSize.width + "," + screenSize.height);
     }
 
     private void authenticateClient() throws IOException, ClassNotFoundException {
@@ -85,12 +88,12 @@ public class ServerForm extends JFrame {
             while (true) {
                 BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
+                ImageIO.write(screenshot, "png", byteArrayOutputStream);
                 byte[] imageBytes = byteArrayOutputStream.toByteArray();
 
                 outputStream.writeObject(imageBytes);
                 outputStream.flush();
-                Thread.sleep(100); // Điều chỉnh tốc độ truyền
+                Thread.sleep(100); // Điều chỉnh tốc độ gửi
             }
         } catch (Exception e) {
             logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
@@ -111,6 +114,11 @@ public class ServerForm extends JFrame {
                 } else if (command.equals("click")) {
                     robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
                     robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                } else if (command.startsWith("drag")) {
+                    String[] parts = command.split(",");
+                    int x = Integer.parseInt(parts[1]);
+                    int y = Integer.parseInt(parts[2]);
+                    robot.mouseMove(x, y);
                 } else if (command.startsWith("key")) {
                     int keyCode = Integer.parseInt(command.split(",")[1]);
                     robot.keyPress(keyCode);

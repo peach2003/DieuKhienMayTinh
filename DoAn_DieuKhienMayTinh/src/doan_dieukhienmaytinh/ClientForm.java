@@ -9,7 +9,7 @@ import java.net.*;
 public class ClientForm extends JFrame {
     private JTextField serverIpField;
     private JPasswordField passwordField;
-    private JButton connectButton;
+    private JButton connectButton, sendFileButton;
     private JLabel screenLabel;
     private Socket socket;
     private ObjectOutputStream outputStream;
@@ -23,13 +23,17 @@ public class ClientForm extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel topPanel = new JPanel(new GridLayout(1, 3));
+        JPanel topPanel = new JPanel(new GridLayout(1, 4));
         serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
+        sendFileButton = new JButton("Gửi File");
+        sendFileButton.setEnabled(false);
+
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
+        topPanel.add(sendFileButton);
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -44,6 +48,8 @@ public class ClientForm extends JFrame {
                 disconnectFromServer();
             }
         });
+
+        sendFileButton.addActionListener(e -> sendFile());
     }
 
     private void connectToServer() {
@@ -70,6 +76,8 @@ public class ClientForm extends JFrame {
 
             JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             connectButton.setText("Disconnect");
+            sendFileButton.setEnabled(true);
+
             new Thread(this::receiveScreen).start();
             setupControlListeners();
         } catch (Exception e) {
@@ -85,6 +93,7 @@ public class ClientForm extends JFrame {
             }
             JOptionPane.showMessageDialog(this, "Đã ngắt kết nối.");
             connectButton.setText("Connect");
+            sendFileButton.setEnabled(false);
             screenLabel.setIcon(null);
             dispose(); // Close the client form
         } catch (IOException e) {
@@ -165,6 +174,35 @@ public class ClientForm extends JFrame {
             outputStream.writeObject(event);
         } catch (IOException ex) {
             ex.printStackTrace();
+        }
+    }
+
+    private void sendFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            try {
+                outputStream.writeObject("sendFile");
+                outputStream.writeObject(selectedFile.getName());
+                outputStream.writeLong(selectedFile.length());
+
+                FileInputStream fis = new FileInputStream(selectedFile);
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+
+                while ((bytesRead = fis.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                fis.close();
+                outputStream.flush();
+
+                String response = (String) inputStream.readObject();
+                JOptionPane.showMessageDialog(this, response);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+            }
         }
     }
 

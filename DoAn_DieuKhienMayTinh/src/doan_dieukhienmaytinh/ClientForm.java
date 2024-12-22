@@ -12,7 +12,6 @@ public class ClientForm extends JFrame {
     private JButton connectButton;
     private JLabel screenLabel;
     private Socket socket;
-    private JButton sendFileButton;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     private int screenWidthServer;
@@ -28,11 +27,9 @@ public class ClientForm extends JFrame {
         serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
-        sendFileButton = new JButton("Send File");
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
-        topPanel.add(sendFileButton);
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -47,7 +44,6 @@ public class ClientForm extends JFrame {
                 disconnectFromServer();
             }
         });
-        sendFileButton.addActionListener(e -> sendFileToServer());
     }
 
     private void connectToServer() {
@@ -169,48 +165,6 @@ public class ClientForm extends JFrame {
             outputStream.writeObject(event);
         } catch (IOException ex) {
             ex.printStackTrace();
-        }
-    }
-    private void sendFileToServer() {
-        JFileChooser fileChooser = new JFileChooser();
-        int result = fileChooser.showOpenDialog(this);
-
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File file = fileChooser.getSelectedFile();
-            try (
-                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-                DataInputStream input = new DataInputStream(socket.getInputStream());
-                FileInputStream fileInput = new FileInputStream(file);
-            ) {
-                // Gửi tên file
-                output.writeUTF(file.getName());
-
-                // Kiểm tra server có chấp nhận không
-                boolean serverAccept = input.readBoolean();
-                if (!serverAccept) {
-                    JOptionPane.showMessageDialog(this, "File transfer rejected by server.");
-                    return;
-                }
-
-                // Xác nhận vị trí lưu thành công
-                boolean pathAccept = input.readBoolean();
-                if (!pathAccept) {
-                    JOptionPane.showMessageDialog(this, "Server canceled file transfer.");
-                    return;
-                }
-
-                // Gửi dữ liệu file
-                long fileSize = file.length();
-                output.writeLong(fileSize);
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = fileInput.read(buffer)) != -1) {
-                    output.write(buffer, 0, bytesRead);
-                }
-                JOptionPane.showMessageDialog(this, "File sent successfully!");
-            } catch (IOException e) {
-                JOptionPane.showMessageDialog(this, "Error while sending file: " + e.getMessage());
-            }
         }
     }
 

@@ -95,7 +95,7 @@ public class ServerForm extends JFrame {
 
                 outputStream.writeObject(imageBytes);
                 outputStream.flush();
-                Thread.sleep(100); // Điều chỉnh tốc độ gửi
+                Thread.sleep(50); // Điều chỉnh tốc độ gửi
             }
         } catch (SocketException se) {
             logArea.append("Kết nối với client đã bị đóng.\n");

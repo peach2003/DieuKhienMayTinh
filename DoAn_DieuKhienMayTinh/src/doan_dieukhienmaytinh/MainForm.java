@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
 
 public class MainForm extends JFrame {
 
@@ -49,6 +50,7 @@ public class MainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 mainPanel.removeAll();
                 ClientForm clientForm = new ClientForm();
+                setupClientConnectButton(clientForm);
                 mainPanel.add(clientForm.getContentPane(), BorderLayout.CENTER);
                 mainPanel.revalidate();
                 mainPanel.repaint();
@@ -57,6 +59,32 @@ public class MainForm extends JFrame {
 
         // Sự kiện cho menu item Exit
         exit.addActionListener(e -> System.exit(0));
+    }
+
+    private void setupClientConnectButton(ClientForm clientForm) {
+        JButton connectButton = clientForm.getConnectButton();
+        connectButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (clientForm.isConnected()) {
+                    try {
+                        clientForm.disconnectFromServer();
+                        connectButton.setText("Connect");
+                        JOptionPane.showMessageDialog(clientForm, "Disconnected successfully.");
+                    } catch (IOException ex) {
+                        JOptionPane.showMessageDialog(clientForm, "Error while disconnecting: " + ex.getMessage());
+                    }
+                } else {
+                    boolean connected = clientForm.connectToServer();
+                    if (connected) {
+                        connectButton.setText("Disconnect");
+                        JOptionPane.showMessageDialog(clientForm, "Connected successfully.");
+                    } else {
+                        JOptionPane.showMessageDialog(clientForm, "Failed to connect. Please check the server IP and try again.");
+                    }
+                }
+            }
+        });
     }
 
     public static void main(String[] args) {

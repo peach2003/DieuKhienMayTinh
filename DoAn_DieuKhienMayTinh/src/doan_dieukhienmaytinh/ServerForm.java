@@ -88,14 +88,29 @@ public class ServerForm extends JFrame {
             Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
             while (true) {
+                // Chụp màn hình
                 BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
+
+                // Giảm kích thước ảnh
+                int newWidth = screenSize.width / 2;  // Giảm kích thước xuống 50%
+                int newHeight = screenSize.height / 2;
+                Image scaledImage = screenshot.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
+                BufferedImage resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g = resizedImage.createGraphics();
+                g.drawImage(scaledImage, 0, 0, null);
+                g.dispose();
+
+                // Nén ảnh
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
+                ImageIO.write(resizedImage, "jpg", byteArrayOutputStream);
                 byte[] imageBytes = byteArrayOutputStream.toByteArray();
 
+                // Gửi ảnh đến client
                 outputStream.writeObject(imageBytes);
                 outputStream.flush();
-                Thread.sleep(100); // Điều chỉnh tốc độ gửi
+
+                // Giảm thời gian chờ giữa các lần gửi
+                Thread.sleep(10); // Giảm từ 30ms xuống 10ms
             }
         } catch (SocketException se) {
             logArea.append("Kết nối với client đã bị đóng.\n");

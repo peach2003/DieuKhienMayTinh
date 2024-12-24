@@ -120,13 +120,16 @@ public class ClientForm extends JFrame {
     private void receiveScreen() {
         try {
             while (true) {
+                // Nhận byte[] từ server
                 byte[] imageBytes = (byte[]) inputStream.readObject();
+
+                // Chuyển byte[] thành ImageIcon
                 ImageIcon icon = new ImageIcon(imageBytes);
 
+                // Hiển thị hình ảnh
                 int width = screenLabel.getWidth();
                 int height = screenLabel.getHeight();
-
-                Image scaledImage = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+                Image scaledImage = icon.getImage().getScaledInstance(width, height, Image.SCALE_FAST);
                 screenLabel.setIcon(new ImageIcon(scaledImage));
                 screenLabel.repaint();
             }

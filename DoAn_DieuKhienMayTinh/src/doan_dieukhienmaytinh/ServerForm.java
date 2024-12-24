@@ -95,7 +95,7 @@ public class ServerForm extends JFrame {
 
                 outputStream.writeObject(imageBytes);
                 outputStream.flush();
-                Thread.sleep(30); // Điều chỉnh tốc độ gửi
+                Thread.sleep(1000); // Điều chỉnh tốc độ gửi
             }
         } catch (SocketException se) {
             logArea.append("Kết nối với client đã bị đóng.\n");
@@ -156,19 +156,24 @@ public class ServerForm extends JFrame {
         try {
             String fileName = (String) inputStream.readObject();
             byte[] fileBytes = (byte[]) inputStream.readObject();
-
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setDialogTitle("Chọn nơi lưu file: " + fileName);
-            int userSelection = fileChooser.showSaveDialog(this);
-            if (userSelection == JFileChooser.APPROVE_OPTION) {
-                File saveFile = fileChooser.getSelectedFile();
-                try (FileOutputStream fos = new FileOutputStream(saveFile)) {
-                    fos.write(fileBytes);
-                }
-                logArea.append("File \"" + fileName + "\" đã được lưu thành công tại: " + saveFile.getAbsolutePath() + "\n");
-            } else {
-                logArea.append("Người dùng từ chối lưu file \"" + fileName + "\".\n");
+            
+            // Xác định thư mục "Download" của hệ thống
+            String userHome = System.getProperty("user.home");
+            File downloadDir = new File(userHome, "Downloads");
+            if (!downloadDir.exists()) {
+                downloadDir.mkdirs(); // Tạo thư mục nếu chưa tồn tại
             }
+
+            // Tạo file trong thư mục "Download"
+            File saveFile = new File(downloadDir, fileName);
+
+            // Ghi dữ liệu file vào file
+            try (FileOutputStream fos = new FileOutputStream(saveFile)) {
+                fos.write(fileBytes);
+            }
+
+            // Ghi log thông báo lưu file thành công
+            logArea.append("File \"" + fileName + "\" đã được lưu thành công tại: " + saveFile.getAbsolutePath() + "\n");
         } catch (Exception e) {
             logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
         }

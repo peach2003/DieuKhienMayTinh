@@ -28,6 +28,7 @@ public class ClientForm extends JFrame {
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
         sendFileButton = new JButton("Gửi File");
+        sendFileButton.setEnabled(false);
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
@@ -73,6 +74,7 @@ public class ClientForm extends JFrame {
 
             JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             connectButton.setText("Disconnect");
+            sendFileButton.setEnabled(true);
             new Thread(this::receiveScreen).start();
             setupControlListeners();
         } catch (Exception e) {

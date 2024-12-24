@@ -90,12 +90,12 @@ public class ServerForm extends JFrame {
             while (true) {
                 BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ImageIO.write(screenshot, "png", byteArrayOutputStream);
+                ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
                 byte[] imageBytes = byteArrayOutputStream.toByteArray();
 
                 outputStream.writeObject(imageBytes);
                 outputStream.flush();
-                Thread.sleep(50); // Điều chỉnh tốc độ gửi
+                Thread.sleep(30); // Điều chỉnh tốc độ gửi
             }
         } catch (SocketException se) {
             logArea.append("Kết nối với client đã bị đóng.\n");

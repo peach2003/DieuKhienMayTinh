@@ -105,16 +105,22 @@ public class ServerForm extends JFrame {
     }
 
     private void handleClientCommands() {
-        try {
-            Robot robot = new Robot();
+    try {
+        Robot robot = new Robot();
 
-            while (true) {
-                String command = (String) inputStream.readObject();
+        while (true) {
+            Object receivedObject = inputStream.readObject();
+            
+            // Kiểm tra loại dữ liệu nhận được
+            if (receivedObject instanceof String) {
+                String command = (String) receivedObject;
+                
                 if ("disconnect".equals(command)) {
                     logArea.append("Máy khách đã ngắt kết nối\n");
                     break;
-                }
-                if (command.startsWith("mouse")) {
+                } else if ("file".equals(command)) {
+                    receiveFile();
+                } else if (command.startsWith("mouse")) {
                     String[] parts = command.split(",");
                     int x = Integer.parseInt(parts[1]);
                     int y = Integer.parseInt(parts[2]);
@@ -132,11 +138,39 @@ public class ServerForm extends JFrame {
                     robot.keyPress(keyCode);
                     robot.keyRelease(keyCode);
                 }
+            } else if (receivedObject instanceof byte[]) {
+                // Nếu nhận được byte[], có thể xử lý riêng (nếu cần)
+                logArea.append("Đã nhận được dữ liệu kiểu byte[], nhưng không xử lý tại đây.\n");
+            } else {
+                logArea.append("Loại dữ liệu không được hỗ trợ: " + receivedObject.getClass().getName() + "\n");
             }
-        } catch (SocketException se) {
-            logArea.append("Kết nối với client đã bị đóng.\n");
+        }
+    } catch (SocketException se) {
+        logArea.append("Kết nối với client đã bị đóng.\n");
+    } catch (Exception e) {
+        logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
+    }
+}
+
+    private void receiveFile() {
+        try {
+            String fileName = (String) inputStream.readObject();
+            byte[] fileBytes = (byte[]) inputStream.readObject();
+
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Chọn nơi lưu file: " + fileName);
+            int userSelection = fileChooser.showSaveDialog(this);
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File saveFile = fileChooser.getSelectedFile();
+                try (FileOutputStream fos = new FileOutputStream(saveFile)) {
+                    fos.write(fileBytes);
+                }
+                logArea.append("File \"" + fileName + "\" đã được lưu thành công tại: " + saveFile.getAbsolutePath() + "\n");
+            } else {
+                logArea.append("Người dùng từ chối lưu file \"" + fileName + "\".\n");
+            }
         } catch (Exception e) {
-            logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
+            logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
         }
     }
 

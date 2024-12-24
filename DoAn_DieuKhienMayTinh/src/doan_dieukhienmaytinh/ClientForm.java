@@ -9,7 +9,7 @@ import java.net.*;
 public class ClientForm extends JFrame {
     private JTextField serverIpField;
     private JPasswordField passwordField;
-    private JButton connectButton;
+    private JButton connectButton, sendFileButton;
     private JLabel screenLabel;
     private Socket socket;
     private ObjectOutputStream outputStream;
@@ -27,9 +27,11 @@ public class ClientForm extends JFrame {
         serverIpField = new JTextField("Nhập IP Server");
         passwordField = new JPasswordField("123456");
         connectButton = new JButton("Connect");
+        sendFileButton = new JButton("Gửi File");
         topPanel.add(serverIpField);
         topPanel.add(passwordField);
         topPanel.add(connectButton);
+        topPanel.add(sendFileButton);
 
         screenLabel = new JLabel();
         screenLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -44,6 +46,7 @@ public class ClientForm extends JFrame {
                 disconnectFromServer();
             }
         });
+        sendFileButton.addActionListener(e -> sendFile());
     }
 
     private void connectToServer() {
@@ -89,6 +92,26 @@ public class ClientForm extends JFrame {
             dispose(); // Close the client form
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "Lỗi khi ngắt kết nối: " + e.getMessage());
+        }
+    }
+    private void sendFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        int returnValue = fileChooser.showOpenDialog(this);
+        if (returnValue == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            try {
+                outputStream.writeObject("file"); // Gửi tín hiệu gửi file
+                outputStream.writeObject(file.getName()); // Gửi tên file
+
+                byte[] fileBytes = new byte[(int) file.length()];
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    fis.read(fileBytes);
+                }
+                outputStream.writeObject(fileBytes); // Gửi nội dung file
+                JOptionPane.showMessageDialog(this, "Đã gửi file: " + file.getName());
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Lỗi khi gửi file: " + e.getMessage());
+            }
         }
     }
 

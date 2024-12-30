@@ -9,6 +9,7 @@ import java.net.*;
 import javax.imageio.ImageIO;
 
 public class ServerForm extends JFrame {
+
     private JTextArea logArea;
     private JLabel ipLabel;
     private ServerSocket serverSocket;
@@ -16,7 +17,10 @@ public class ServerForm extends JFrame {
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     private static final int PORT = 5000;
+    private static final int CHAT_PORT = 5001;
     private static final String PASSWORD = "123456";
+    private ServerSocket chatServerSocket;
+    private Socket chatSocket;
 
     public ServerForm() {
         setTitle("Remote Desktop Server");
@@ -44,7 +48,9 @@ public class ServerForm extends JFrame {
                 logArea.append("Server đang chạy trên IP: " + ipAddress + ", cổng: " + PORT + "\n");
 
                 serverSocket = new ServerSocket(PORT);
+                chatServerSocket = new ServerSocket(CHAT_PORT); // Khởi tạo chatServerSocket
                 while (true) {
+                    // Kết nối chính (chia sẻ màn hình và gửi file)
                     clientSocket = serverSocket.accept();
                     logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
 
@@ -53,6 +59,19 @@ public class ServerForm extends JFrame {
 
                     sendScreenSize();
                     authenticateClient();
+
+                    // Kết nối phụ (chat)
+                    new Thread(() -> {
+                        try {
+                            chatSocket = chatServerSocket.accept(); // Chấp nhận kết nối chat
+                            logArea.append("Socket chat kết nối: " + chatSocket.getInetAddress() + "\n");
+                            JFrame chatForm = new ChatForm("Server Chat", chatSocket);
+                            SwingUtilities.invokeLater(() -> chatForm.setVisible(true));
+                        } catch (IOException e) {
+                            logArea.append("Lỗi khi kết nối socket chat: " + e.getMessage() + "\n");
+                        }
+                    }).start();
+                    // Bắt đầu chia sẻ màn hình
                     new Thread(this::sendScreenToClient).start();
                     handleClientCommands();
                 }
@@ -105,58 +124,58 @@ public class ServerForm extends JFrame {
     }
 
     private void handleClientCommands() {
-    try {
-        Robot robot = new Robot();
+        try {
+            Robot robot = new Robot();
 
-        while (true) {
-            Object receivedObject = inputStream.readObject();
-            
-            // Kiểm tra loại dữ liệu nhận được
-            if (receivedObject instanceof String) {
-                String command = (String) receivedObject;
-                
-                if ("disconnect".equals(command)) {
-                    logArea.append("Máy khách đã ngắt kết nối\n");
-                    break;
-                } else if ("file".equals(command)) {
-                    receiveFile();
-                } else if (command.startsWith("mouse")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.equals("click")) {
-                    robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-                    robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
-                } else if (command.startsWith("drag")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.startsWith("key")) {
-                    int keyCode = Integer.parseInt(command.split(",")[1]);
-                    robot.keyPress(keyCode);
-                    robot.keyRelease(keyCode);
+            while (true) {
+                Object receivedObject = inputStream.readObject();
+
+                // Kiểm tra loại dữ liệu nhận được
+                if (receivedObject instanceof String) {
+                    String command = (String) receivedObject;
+
+                    if ("disconnect".equals(command)) {
+                        logArea.append("Máy khách đã ngắt kết nối\n");
+                        break;
+                    } else if ("file".equals(command)) {
+                        receiveFile();
+                    } else if (command.startsWith("mouse")) {
+                        String[] parts = command.split(",");
+                        int x = Integer.parseInt(parts[1]);
+                        int y = Integer.parseInt(parts[2]);
+                        robot.mouseMove(x, y);
+                    } else if (command.equals("click")) {
+                        robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+                        robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                    } else if (command.startsWith("drag")) {
+                        String[] parts = command.split(",");
+                        int x = Integer.parseInt(parts[1]);
+                        int y = Integer.parseInt(parts[2]);
+                        robot.mouseMove(x, y);
+                    } else if (command.startsWith("key")) {
+                        int keyCode = Integer.parseInt(command.split(",")[1]);
+                        robot.keyPress(keyCode);
+                        robot.keyRelease(keyCode);
+                    }
+                } else if (receivedObject instanceof byte[]) {
+                    // Nếu nhận được byte[], có thể xử lý riêng (nếu cần)
+                    logArea.append("Đã nhận được dữ liệu kiểu byte[], nhưng không xử lý tại đây.\n");
+                } else {
+                    logArea.append("Loại dữ liệu không được hỗ trợ: " + receivedObject.getClass().getName() + "\n");
                 }
-            } else if (receivedObject instanceof byte[]) {
-                // Nếu nhận được byte[], có thể xử lý riêng (nếu cần)
-                logArea.append("Đã nhận được dữ liệu kiểu byte[], nhưng không xử lý tại đây.\n");
-            } else {
-                logArea.append("Loại dữ liệu không được hỗ trợ: " + receivedObject.getClass().getName() + "\n");
             }
+        } catch (SocketException se) {
+            logArea.append("Kết nối với client đã bị đóng.\n");
+        } catch (Exception e) {
+            logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
         }
-    } catch (SocketException se) {
-        logArea.append("Kết nối với client đã bị đóng.\n");
-    } catch (Exception e) {
-        logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
     }
-}
 
     private void receiveFile() {
         try {
             String fileName = (String) inputStream.readObject();
             byte[] fileBytes = (byte[]) inputStream.readObject();
-            
+
             // Xác định thư mục "Download" của hệ thống
             String userHome = System.getProperty("user.home");
             File downloadDir = new File(userHome, "Downloads");

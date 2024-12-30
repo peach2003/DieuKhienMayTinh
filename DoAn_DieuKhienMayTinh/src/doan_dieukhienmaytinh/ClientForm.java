@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.*;
 
 public class ClientForm extends JFrame {
+
     private JTextField serverIpField;
     private JPasswordField passwordField;
     private JButton connectButton, sendFileButton;
@@ -75,6 +76,17 @@ public class ClientForm extends JFrame {
             JOptionPane.showMessageDialog(this, "Kết nối thành công!");
             connectButton.setText("Disconnect");
             sendFileButton.setEnabled(true);
+
+            // Kết nối phụ (chat)
+            new Thread(() -> {
+                try {
+                    Socket chatSocket = new Socket(serverIp, 5001); // Kết nối tới CHAT_PORT
+                    JFrame chatForm = new ChatForm("Client Chat", chatSocket);
+                    SwingUtilities.invokeLater(() -> chatForm.setVisible(true)); // Hiển thị form chat
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this, "Lỗi kết nối chat: " + e.getMessage());
+                }
+            }).start();
             new Thread(this::receiveScreen).start();
             setupControlListeners();
         } catch (Exception e) {
@@ -96,6 +108,7 @@ public class ClientForm extends JFrame {
             JOptionPane.showMessageDialog(this, "Lỗi khi ngắt kết nối: " + e.getMessage());
         }
     }
+
     private void sendFile() {
         JFileChooser fileChooser = new JFileChooser();
         int returnValue = fileChooser.showOpenDialog(this);

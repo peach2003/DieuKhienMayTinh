@@ -2,14 +2,13 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.InputEvent;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
-import javax.imageio.ImageIO;
 
 public class ServerForm extends JFrame {
-    private JTextArea logArea;
+    private JTextArea logArea, chatArea;
+    private JTextField chatInputField;
+    private JButton sendChatButton;
     private JLabel ipLabel;
     private ServerSocket serverSocket;
     private Socket clientSocket;
@@ -20,18 +19,36 @@ public class ServerForm extends JFrame {
 
     public ServerForm() {
         setTitle("Remote Desktop Server");
-        setSize(500, 400);
+        setSize(600, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
         logArea = new JTextArea();
         logArea.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(logArea);
+        JScrollPane logScrollPane = new JScrollPane(logArea);
 
         ipLabel = new JLabel("IP: Đang khởi động...", SwingConstants.CENTER);
 
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        chatArea = new JTextArea();
+        chatArea.setEditable(false);
+        JScrollPane chatScrollPane = new JScrollPane(chatArea);
+
+        chatInputField = new JTextField();
+        sendChatButton = new JButton("Send");
+        sendChatButton.setEnabled(false);
+
+        bottomPanel.add(chatScrollPane, BorderLayout.CENTER);
+        JPanel chatInputPanel = new JPanel(new BorderLayout());
+        chatInputPanel.add(chatInputField, BorderLayout.CENTER);
+        chatInputPanel.add(sendChatButton, BorderLayout.EAST);
+        bottomPanel.add(chatInputPanel, BorderLayout.SOUTH);
+
         add(ipLabel, BorderLayout.NORTH);
-        add(scrollPane, BorderLayout.CENTER);
+        add(logScrollPane, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        sendChatButton.addActionListener(e -> sendChat());
 
         startServer();
     }
@@ -53,8 +70,9 @@ public class ServerForm extends JFrame {
 
                     sendScreenSize();
                     authenticateClient();
-                    new Thread(this::sendScreenToClient).start();
-                    handleClientCommands();
+                    sendChatButton.setEnabled(true);
+
+                    new Thread(this::receiveChat).start();
                 }
             } catch (Exception e) {
                 logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
@@ -82,100 +100,32 @@ public class ServerForm extends JFrame {
         outputStream.writeObject("Máy khách xác thực thành công");
     }
 
-    private void sendScreenToClient() {
-        try {
-            Robot robot = new Robot();
-            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+    private void sendChat() {
+        String message = chatInputField.getText().trim();
+        if (!message.isEmpty()) {
+            try {
+                outputStream.writeObject("chat," + message);
+                chatArea.append("Server: " + message + "\n");
+                chatInputField.setText("");
+            } catch (IOException e) {
+                logArea.append("Lỗi khi gửi tin nhắn: " + e.getMessage() + "\n");
+            }
+        }
+    }
 
+    private void receiveChat() {
+        try {
             while (true) {
-                BufferedImage screenshot = robot.createScreenCapture(new Rectangle(screenSize));
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ImageIO.write(screenshot, "jpg", byteArrayOutputStream);
-                byte[] imageBytes = byteArrayOutputStream.toByteArray();
-
-                outputStream.writeObject(imageBytes);
-                outputStream.flush();
-                Thread.sleep(100); // Điều chỉnh tốc độ gửi
-            }
-        } catch (SocketException se) {
-            logArea.append("Kết nối với client đã bị đóng.\n");
-        } catch (Exception e) {
-            logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
-        }
-    }
-
-    private void handleClientCommands() {
-    try {
-        Robot robot = new Robot();
-
-        while (true) {
-            Object receivedObject = inputStream.readObject();
-            
-            // Kiểm tra loại dữ liệu nhận được
-            if (receivedObject instanceof String) {
-                String command = (String) receivedObject;
-                
-                if ("disconnect".equals(command)) {
-                    logArea.append("Máy khách đã ngắt kết nối\n");
-                    break;
-                } else if ("file".equals(command)) {
-                    receiveFile();
-                } else if (command.startsWith("mouse")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.equals("click")) {
-                    robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-                    robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
-                } else if (command.startsWith("drag")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.startsWith("key")) {
-                    int keyCode = Integer.parseInt(command.split(",")[1]);
-                    robot.keyPress(keyCode);
-                    robot.keyRelease(keyCode);
+                Object receivedObject = inputStream.readObject();
+                if (receivedObject instanceof String) {
+                    String message = (String) receivedObject;
+                    if (message.startsWith("chat,")) {
+                        chatArea.append("Client: " + message.substring(5) + "\n");
+                    }
                 }
-            } else if (receivedObject instanceof byte[]) {
-                // Nếu nhận được byte[], có thể xử lý riêng (nếu cần)
-                logArea.append("Đã nhận được dữ liệu kiểu byte[], nhưng không xử lý tại đây.\n");
-            } else {
-                logArea.append("Loại dữ liệu không được hỗ trợ: " + receivedObject.getClass().getName() + "\n");
             }
-        }
-    } catch (SocketException se) {
-        logArea.append("Kết nối với client đã bị đóng.\n");
-    } catch (Exception e) {
-        logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
-    }
-}
-
-    private void receiveFile() {
-        try {
-            String fileName = (String) inputStream.readObject();
-            byte[] fileBytes = (byte[]) inputStream.readObject();
-            
-            // Xác định thư mục "Download" của hệ thống
-            String userHome = System.getProperty("user.home");
-            File downloadDir = new File(userHome, "Downloads");
-            if (!downloadDir.exists()) {
-                downloadDir.mkdirs(); // Tạo thư mục nếu chưa tồn tại
-            }
-
-            // Tạo file trong thư mục "Download"
-            File saveFile = new File(downloadDir, fileName);
-
-            // Ghi dữ liệu file vào file
-            try (FileOutputStream fos = new FileOutputStream(saveFile)) {
-                fos.write(fileBytes);
-            }
-
-            // Ghi log thông báo lưu file thành công
-            logArea.append("File \"" + fileName + "\" đã được lưu thành công tại: " + saveFile.getAbsolutePath() + "\n");
         } catch (Exception e) {
-            logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
+            chatArea.append("Mất kết nối với Client!\n");
         }
     }
 

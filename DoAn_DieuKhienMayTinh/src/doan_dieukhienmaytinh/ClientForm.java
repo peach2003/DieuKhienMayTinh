@@ -47,40 +47,54 @@ public class ClientForm extends JFrame {
                 disconnectFromServer();
             }
         });
+
         sendFileButton.addActionListener(e -> sendFile());
     }
 
     private void connectToServer() {
-        String serverIp = serverIpField.getText();
-        String password = new String(passwordField.getPassword());
+    String serverIp = serverIpField.getText();
+    String password = new String(passwordField.getPassword());
 
-        try {
-            socket = new Socket(serverIp, 5000);
-            outputStream = new ObjectOutputStream(socket.getOutputStream());
-            inputStream = new ObjectInputStream(socket.getInputStream());
+    try {
+        // Kết nối chính (chia sẻ màn hình và gửi file)
+        socket = new Socket(serverIp, 5000);
+        outputStream = new ObjectOutputStream(socket.getOutputStream());
+        inputStream = new ObjectInputStream(socket.getInputStream());
 
-            String[] screenSize = ((String) inputStream.readObject()).split(",");
-            screenWidthServer = Integer.parseInt(screenSize[0]);
-            screenHeightServer = Integer.parseInt(screenSize[1]);
+        String[] screenSize = ((String) inputStream.readObject()).split(",");
+        screenWidthServer = Integer.parseInt(screenSize[0]);
+        screenHeightServer = Integer.parseInt(screenSize[1]);
 
-            outputStream.writeObject(password);
+        outputStream.writeObject(password);
 
-            String response = (String) inputStream.readObject();
-            if (!response.equals("Máy khách xác thực thành công")) {
-                JOptionPane.showMessageDialog(this, "Xác thực thất bại!");
-                socket.close();
-                return;
-            }
-
-            JOptionPane.showMessageDialog(this, "Kết nối thành công!");
-            connectButton.setText("Disconnect");
-            sendFileButton.setEnabled(true);
-            new Thread(this::receiveScreen).start();
-            setupControlListeners();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Lỗi kết nối: " + e.getMessage());
+        String response = (String) inputStream.readObject();
+        if (!response.equals("Máy khách xác thực thành công")) {
+            JOptionPane.showMessageDialog(this, "Xác thực thất bại!");
+            socket.close();
+            return;
         }
+
+        JOptionPane.showMessageDialog(this, "Kết nối thành công!");
+        connectButton.setText("Disconnect");
+        sendFileButton.setEnabled(true);
+
+        // Kết nối phụ (chat)
+        Socket chatSocket = new Socket(serverIp, 5001);
+        if (chatSocket != null) {
+            JFrame chatForm = new ChatForm("Client Chat", chatSocket);
+            SwingUtilities.invokeLater(() -> chatForm.setVisible(true));
+        } else {
+            JOptionPane.showMessageDialog(this, "Không thể kết nối đến socket chat.");
+        }
+
+        // Bắt đầu nhận chia sẻ màn hình
+        new Thread(this::receiveScreen).start();
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Lỗi kết nối: " + e.getMessage());
     }
+}
+
+
 
     private void disconnectFromServer() {
         try {
@@ -91,11 +105,11 @@ public class ClientForm extends JFrame {
             JOptionPane.showMessageDialog(this, "Đã ngắt kết nối.");
             connectButton.setText("Connect");
             screenLabel.setIcon(null);
-            dispose(); // Close the client form
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "Lỗi khi ngắt kết nối: " + e.getMessage());
         }
     }
+
     private void sendFile() {
         JFileChooser fileChooser = new JFileChooser();
         int returnValue = fileChooser.showOpenDialog(this);
@@ -133,63 +147,6 @@ public class ClientForm extends JFrame {
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Mất kết nối với Server!");
             disconnectFromServer();
-        }
-    }
-
-    private void setupControlListeners() {
-        screenLabel.addMouseMotionListener(new MouseMotionAdapter() {
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                if (socket != null && !socket.isClosed()) {
-                    sendMouseEvent("mouse", e.getX(), e.getY());
-                }
-            }
-
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                if (socket != null && !socket.isClosed()) {
-                    sendMouseEvent("drag", e.getX(), e.getY());
-                }
-            }
-        });
-
-        screenLabel.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (socket != null && !socket.isClosed()) {
-                    sendEvent("click");
-                }
-            }
-        });
-
-        screenLabel.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (socket != null && !socket.isClosed()) {
-                    sendEvent("key," + e.getKeyCode());
-                }
-            }
-        });
-
-        screenLabel.setFocusable(true);
-        screenLabel.requestFocusInWindow();
-    }
-
-    private void sendMouseEvent(String type, int x, int y) {
-        try {
-            int adjustedX = (x * screenWidthServer) / screenLabel.getWidth();
-            int adjustedY = (y * screenHeightServer) / screenLabel.getHeight();
-            outputStream.writeObject(type + "," + adjustedX + "," + adjustedY);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    private void sendEvent(String event) {
-        try {
-            outputStream.writeObject(event);
-        } catch (IOException ex) {
-            ex.printStackTrace();
         }
     }
 

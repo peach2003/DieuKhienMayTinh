@@ -2,8 +2,6 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 public class MainForm extends JFrame {
 
@@ -27,32 +25,22 @@ public class MainForm extends JFrame {
         menuBar.add(menu);
         setJMenuBar(menuBar);
 
-        // Panel chính để hiển thị các form
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        add(mainPanel, BorderLayout.CENTER);
-
         // Sự kiện cho menu item Open Server
-        openServer.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                mainPanel.removeAll();
+        openServer.addActionListener(e -> {
+            // Mở ServerForm trong một cửa sổ JFrame riêng
+            SwingUtilities.invokeLater(() -> {
                 ServerForm serverForm = new ServerForm();
-                mainPanel.add(serverForm.getContentPane(), BorderLayout.CENTER);
-                mainPanel.revalidate();
-                mainPanel.repaint();
-            }
+                serverForm.setVisible(true);
+            });
         });
 
         // Sự kiện cho menu item Open Client
-        openClient.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                mainPanel.removeAll();
+        openClient.addActionListener(e -> {
+            // Mở ClientForm trong một cửa sổ JFrame riêng
+            SwingUtilities.invokeLater(() -> {
                 ClientForm clientForm = new ClientForm();
-                mainPanel.add(clientForm.getContentPane(), BorderLayout.CENTER);
-                mainPanel.revalidate();
-                mainPanel.repaint();
-            }
+                clientForm.setVisible(true);
+            });
         });
 
         // Sự kiện cho menu item Exit

@@ -2,7 +2,6 @@ package doan_dieukhienmaytinh;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
@@ -16,7 +15,10 @@ public class ServerForm extends JFrame {
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     private static final int PORT = 5000;
+     private static final int CHAT_PORT = 5001;
     private static final String PASSWORD = "123456";
+    private ServerSocket chatServerSocket;
+    private Socket chatSocket;
 
     public ServerForm() {
         setTitle("Remote Desktop Server");
@@ -36,31 +38,46 @@ public class ServerForm extends JFrame {
         startServer();
     }
 
-    private void startServer() {
-        new Thread(() -> {
-            try {
-                String ipAddress = InetAddress.getLocalHost().getHostAddress();
-                ipLabel.setText("IP: " + ipAddress);
-                logArea.append("Server đang chạy trên IP: " + ipAddress + ", cổng: " + PORT + "\n");
+     private void startServer() {
+    new Thread(() -> {
+        try {
+            String ipAddress = InetAddress.getLocalHost().getHostAddress();
+            ipLabel.setText("IP: " + ipAddress);
+            logArea.append("Server đang chạy trên IP: " + ipAddress + ", cổng: " + PORT + "\n");
 
-                serverSocket = new ServerSocket(PORT);
-                while (true) {
-                    clientSocket = serverSocket.accept();
-                    logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
+            serverSocket = new ServerSocket(PORT);
+            chatServerSocket = new ServerSocket(CHAT_PORT);
 
-                    outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
-                    inputStream = new ObjectInputStream(clientSocket.getInputStream());
+            while (true) {
+                // Kết nối chính (chia sẻ màn hình và gửi file)
+                clientSocket = serverSocket.accept();
+                logArea.append("Máy khách kết nối: " + clientSocket.getInetAddress() + "\n");
 
-                    sendScreenSize();
-                    authenticateClient();
-                    new Thread(this::sendScreenToClient).start();
-                    handleClientCommands();
+                outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                inputStream = new ObjectInputStream(clientSocket.getInputStream());
+
+                sendScreenSize();
+                authenticateClient();
+
+                // Kết nối phụ (chat)
+                chatSocket = chatServerSocket.accept();
+                if (chatSocket != null) {
+                    logArea.append("Socket chat kết nối: " + chatSocket.getInetAddress() + "\n");
+                    JFrame chatForm = new ChatForm("Server Chat", chatSocket);
+                    SwingUtilities.invokeLater(() -> chatForm.setVisible(true));
+                } else {
+                    logArea.append("Không thể tạo socket chat.\n");
                 }
-            } catch (Exception e) {
-                logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
+
+                // Bắt đầu chia sẻ màn hình
+                new Thread(this::sendScreenToClient).start();
             }
-        }).start();
-    }
+        } catch (Exception e) {
+            logArea.append("Lỗi khi chạy server: " + e.getMessage() + "\n");
+        }
+    }).start();
+}
+
 
     private void sendScreenSize() throws IOException {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
@@ -69,16 +86,16 @@ public class ServerForm extends JFrame {
 
     private void authenticateClient() throws IOException, ClassNotFoundException {
         String receivedPassword = (String) inputStream.readObject();
-        logArea.append("Mật khẩu nhận được: " + receivedPassword + "\n");
+        logArea.append("Mật khẩu nhận được: " + receivedPassword + "\\n");
 
         if (!PASSWORD.equals(receivedPassword)) {
-            logArea.append("Xác thực thất bại\n");
+            logArea.append("Xác thực thất bại\\n");
             outputStream.writeObject("Xác thực thất bại");
             clientSocket.close();
             throw new SecurityException("Sai mật khẩu");
         }
 
-        logArea.append("Xác thực thành công\n");
+        logArea.append("Xác thực thành công\\n");
         outputStream.writeObject("Máy khách xác thực thành công");
     }
 
@@ -97,85 +114,8 @@ public class ServerForm extends JFrame {
                 outputStream.flush();
                 Thread.sleep(100); // Điều chỉnh tốc độ gửi
             }
-        } catch (SocketException se) {
-            logArea.append("Kết nối với client đã bị đóng.\n");
         } catch (Exception e) {
-            logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\n");
-        }
-    }
-
-    private void handleClientCommands() {
-    try {
-        Robot robot = new Robot();
-
-        while (true) {
-            Object receivedObject = inputStream.readObject();
-            
-            // Kiểm tra loại dữ liệu nhận được
-            if (receivedObject instanceof String) {
-                String command = (String) receivedObject;
-                
-                if ("disconnect".equals(command)) {
-                    logArea.append("Máy khách đã ngắt kết nối\n");
-                    break;
-                } else if ("file".equals(command)) {
-                    receiveFile();
-                } else if (command.startsWith("mouse")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.equals("click")) {
-                    robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-                    robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
-                } else if (command.startsWith("drag")) {
-                    String[] parts = command.split(",");
-                    int x = Integer.parseInt(parts[1]);
-                    int y = Integer.parseInt(parts[2]);
-                    robot.mouseMove(x, y);
-                } else if (command.startsWith("key")) {
-                    int keyCode = Integer.parseInt(command.split(",")[1]);
-                    robot.keyPress(keyCode);
-                    robot.keyRelease(keyCode);
-                }
-            } else if (receivedObject instanceof byte[]) {
-                // Nếu nhận được byte[], có thể xử lý riêng (nếu cần)
-                logArea.append("Đã nhận được dữ liệu kiểu byte[], nhưng không xử lý tại đây.\n");
-            } else {
-                logArea.append("Loại dữ liệu không được hỗ trợ: " + receivedObject.getClass().getName() + "\n");
-            }
-        }
-    } catch (SocketException se) {
-        logArea.append("Kết nối với client đã bị đóng.\n");
-    } catch (Exception e) {
-        logArea.append("Lỗi khi xử lý lệnh từ client: " + e.getMessage() + "\n");
-    }
-}
-
-    private void receiveFile() {
-        try {
-            String fileName = (String) inputStream.readObject();
-            byte[] fileBytes = (byte[]) inputStream.readObject();
-            
-            // Xác định thư mục "Download" của hệ thống
-            String userHome = System.getProperty("user.home");
-            File downloadDir = new File(userHome, "Downloads");
-            if (!downloadDir.exists()) {
-                downloadDir.mkdirs(); // Tạo thư mục nếu chưa tồn tại
-            }
-
-            // Tạo file trong thư mục "Download"
-            File saveFile = new File(downloadDir, fileName);
-
-            // Ghi dữ liệu file vào file
-            try (FileOutputStream fos = new FileOutputStream(saveFile)) {
-                fos.write(fileBytes);
-            }
-
-            // Ghi log thông báo lưu file thành công
-            logArea.append("File \"" + fileName + "\" đã được lưu thành công tại: " + saveFile.getAbsolutePath() + "\n");
-        } catch (Exception e) {
-            logArea.append("Lỗi khi nhận file: " + e.getMessage() + "\n");
+            logArea.append("Lỗi khi gửi màn hình: " + e.getMessage() + "\\n");
         }
     }
 
